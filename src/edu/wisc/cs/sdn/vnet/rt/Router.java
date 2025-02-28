@@ -7,11 +7,6 @@ import edu.wisc.cs.sdn.vnet.Iface;
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.packet.MACAddress;
-import net.floodlightcontroller.packet.ARP;
-import net.floodlightcontroller.packet.ICMP;
-import net.floodlightcontroller.packet.Data;
-
-import java.nio.ByteBuffer;
 
 /**
  * @author Aaron Gember-Jacobson and Anubhavnidhi Abhashkumar
@@ -22,6 +17,8 @@ public class Router extends Device {
 
   /** ARP cache for the router */
   private ArpCache arpCache;
+
+  private final boolean dbg = false;
 
   /**
    * Creates a router for a specific host.
@@ -87,70 +84,74 @@ public class Router extends Device {
     System.out.println("*** -> Received packet: " +
         etherPacket.toString().replace("\n", "\n\t"));
 
-    // Step 1: Ensure the packet is an IPv4 packet
-    if (etherPacket.getEtherType() != Ethernet.TYPE_IPv4) {
-      return; // Drop the packet if not IPv4
-    }
+    /********************************************************************/
+    /* TODO: Handle packets */
 
-    // Step 2: Extract IPv4 packet from Ethernet frame
-    IPv4 ipPacket = (IPv4) etherPacket.getPayload();
+    if (dbg)
+      System.out.println("Router Checking Ethernet Type");
+    if (etherPacket.getEtherType() == Ethernet.TYPE_IPv4) {
 
-    // Step 3: Verify IP checksum
-    short receivedChecksum = ipPacket.getChecksum();
-    ipPacket.resetChecksum(); // Reset checksum before recalculating
-    byte[] serialized = ipPacket.serialize();
-    short computedChecksum = (short) ((ByteBuffer.wrap(serialized).getShort(10)) & 0xFFFF);
+      IPv4 header = (IPv4) etherPacket.getPayload();
+      short chksm = header.getChecksum();
+      header = header.setChecksum((short) 0);
+      byte[] serialized = header.serialize();
+      header = (IPv4) header.deserialize(serialized, 0, serialized.length);
 
-    if (receivedChecksum != computedChecksum) {
-      return; // Drop packet if checksum is invalid
-    }
+      if (dbg)
+        System.out.println("Router Checking Checksum");
+      if (chksm == header.getChecksum()) {
+        header = header.setTtl((byte) (header.getTtl() - 1));
 
-    // Step 4: Decrement TTL
-    byte ttl = ipPacket.getTtl();
-    ttl -= 1;
-    if (ttl <= 0) {
-      return; // Drop the packet if TTL expires
-    }
-    ipPacket.setTtl(ttl);
-    ipPacket.resetChecksum(); // Reset checksum after modifying TTL
+        if (dbg)
+          System.out.println("Router Checking TTL");
+        if (header.getTtl() > (byte) 0) {
 
-    // Step 5: Check if the packet is destined for the router itself
-    int destIp = ipPacket.getDestinationAddress();
-    for (Iface iface : this.interfaces.values()) {
-      if (iface.getIpAddress() == destIp) {
-        return; // Drop if the destination IP matches any router interface
+          header = header.setChecksum((short) 0);
+          serialized = header.serialize();
+          header = (IPv4) header.deserialize(serialized, 0, serialized.length);
+          Ethernet nep = (Ethernet) etherPacket.setPayload(header);
+
+          if (dbg)
+            System.out.println("Router Checking dst == router interface");
+          for (Iface ifa : interfaces.values()) {
+            if (ifa.getIpAddress() == header.getDestinationAddress()) {
+              return;
+            }
+          }
+
+          // Forward packet
+
+          if (dbg)
+            System.out.println("Router Lookup RouteTable");
+          RouteEntry re = routeTable.lookup(header.getDestinationAddress());
+          if (re != null) {
+            ArpEntry an = null;
+
+            if (dbg)
+              System.out.println("Router Lookup ARPCache");
+            if (re.getGatewayAddress() != 0) {
+              an = arpCache.lookup(re.getGatewayAddress());
+            } else {
+              an = arpCache.lookup(header.getDestinationAddress());
+            }
+
+            if (dbg)
+              System.out.println("Router Mod Ethernet Frame");
+            if (an != null) {
+              MACAddress dstMac = an.getMac();
+              MACAddress srcMac = re.getInterface().getMacAddress();
+              nep = nep.setDestinationMACAddress(dstMac.toBytes());
+              nep = nep.setSourceMACAddress(srcMac.toBytes());
+            }
+
+            if (dbg)
+              System.out.println("Router Sending Packet");
+            sendPacket(nep, re.getInterface());
+          }
+        }
       }
     }
 
-    // Step 6: Find the appropriate route for forwarding
-    RouteEntry bestRoute = this.routeTable.lookup(destIp);
-    if (bestRoute == null) {
-      return; // Drop packet if no route is found
-    }
-
-    // Step 7: Determine the next hop IP
-    int nextHopIp = bestRoute.getGatewayAddress();
-    if (nextHopIp == 0) {
-      nextHopIp = destIp; // If no gateway, the destination is directly reachable
-    }
-
-    // Step 8: Get the outgoing interface
-    Iface outIface = bestRoute.getInterface();
-    if (outIface == null) {
-      return; // Drop if no outgoing interface is found
-    }
-
-    // Step 9: Lookup the next hop MAC address using the ARP cache
-    MACAddress nextHopMac = this.arpCache.lookup(nextHopIp);
-    if (nextHopMac == null) {
-      return; // Drop if the MAC address is unknown
-    }
-
-    // Step 10: Update Ethernet frame for forwarding
-    etherPacket.setSourceMACAddress(outIface.getMacAddress());
-    etherPacket.setDestinationMACAddress(nextHopMac.toBytes());
-
-    // Step 11: Send the packet out
-    this.sendPacket(etherPacket, outIface);
+    /********************************************************************/
   }
 }
