@@ -73,7 +73,6 @@ public class RouteTable {
 
       if (dbg)
         if (re != null) {
-          System.out.println(re.getInterface().getMacAddress().toString());
           System.out.println("RouteTable Match dstAddr " + IPv4.fromIPv4Address(re.getDestinationAddress()));
           System.out.println("RouteTable Match gtwAddr " + IPv4.fromIPv4Address(re.getGatewayAddress()));
         } else {
