@@ -22,7 +22,7 @@ import edu.wisc.cs.sdn.vnet.Iface;
 public class RouteTable {
   /** Entries in the route table */
   private List<RouteEntry> entries;
-  private final boolean dbg = false;
+  private final boolean dbg = true;
 
   /**
    * Initialize an empty route table.
