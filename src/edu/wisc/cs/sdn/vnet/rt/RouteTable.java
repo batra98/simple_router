@@ -22,7 +22,7 @@ import edu.wisc.cs.sdn.vnet.Iface;
 public class RouteTable {
   /** Entries in the route table */
   private List<RouteEntry> entries;
-  private final boolean dbg = true;
+  private final boolean dbg = false;
 
   /**
    * Initialize an empty route table.
@@ -37,41 +37,52 @@ public class RouteTable {
    * @param ip IP address
    * @return the matching route entry, null if none exists
    */
-
   public RouteEntry lookup(int ip) {
     synchronized (this.entries) {
-      if (entries.isEmpty()) {
-        System.err.println("Route table is empty!");
+      /*****************************************************************/
+      /* TODO: Find the route entry with the longest prefix match */
+
+      if (ip < 0) {
         return null;
       }
 
-      RouteEntry bestMatch = null;
-      int longestPrefix = -1;
+      if (entries == null) {
+        return null;
+      }
 
-      for (RouteEntry entry : entries) {
-        int subnetMask = entry.getMaskAddress();
-        if ((ip & subnetMask) == (entry.getDestinationAddress() & subnetMask)) {
-          int prefixLength = Integer.bitCount(subnetMask);
-          if (prefixLength > longestPrefix) {
-            longestPrefix = prefixLength;
-            bestMatch = entry;
+      ListIterator<RouteEntry> it = entries.listIterator();
+      int lm = 0;
+      RouteEntry re = null;
+      ;
+
+      if (dbg)
+        System.out.println("Lookup RouteTable..." + IPv4.fromIPv4Address(ip));
+      while (it.hasNext()) {
+        RouteEntry curRe = it.next();
+        for (int i = 0; i < 32; i++) {
+          if (ip >>> i == curRe.getDestinationAddress() >>> i) {
+            if (lm < 32 - i) {
+              lm = 32 - i;
+              re = curRe;
+            } else {
+              break;
+            }
           }
         }
       }
 
-      if (dbg) {
-        if (bestMatch != null) {
-          System.out.println("Matched RouteEntry: ");
-          System.out.println(" - Interface: " + bestMatch.getInterface().getName());
-          System.out.println(" - Destination: " + IPv4.fromIPv4Address(bestMatch.getDestinationAddress()));
-          System.out.println(" - Gateway: " + IPv4.fromIPv4Address(bestMatch.getGatewayAddress()));
-          System.out.println(" - Subnet Mask: " + IPv4.fromIPv4Address(bestMatch.getMaskAddress()));
+      if (dbg)
+        if (re != null) {
+          System.out.println(re.getInterface().getMacAddress().toString());
+          System.out.println("RouteTable Match dstAddr " + IPv4.fromIPv4Address(re.getDestinationAddress()));
+          System.out.println("RouteTable Match gtwAddr " + IPv4.fromIPv4Address(re.getGatewayAddress()));
         } else {
-          System.out.println("RouteTable No Match for " + IPv4.fromIPv4Address(ip));
+          System.out.println("RouteTable No Match");
         }
-      }
 
-      return bestMatch;
+      return re;
+
+      /*****************************************************************/
     }
   }
 

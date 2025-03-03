@@ -80,10 +80,12 @@ public class Router extends Device {
    * @param etherPacket the Ethernet packet that was received
    * @param inIface     the interface on which the packet was received
    */
-
   public void handlePacket(Ethernet etherPacket, Iface inIface) {
     System.out.println("*** -> Received packet: " +
         etherPacket.toString().replace("\n", "\n\t"));
+
+    /********************************************************************/
+    /* TODO: Handle packets */
 
     if (dbg)
       System.out.println("Router Checking Ethernet Type");
@@ -113,60 +115,43 @@ public class Router extends Device {
             System.out.println("Router Checking dst == router interface");
           for (Iface ifa : interfaces.values()) {
             if (ifa.getIpAddress() == header.getDestinationAddress()) {
-              return; // Packet is for the router itself, drop it.
+              return;
             }
           }
 
-          // Forwarding the packet
+          // Forward packet
+
           if (dbg)
             System.out.println("Router Lookup RouteTable");
           RouteEntry re = routeTable.lookup(header.getDestinationAddress());
-
           if (re != null) {
             ArpEntry an = null;
 
             if (dbg)
               System.out.println("Router Lookup ARPCache");
-            int nextHopIP = (re.getGatewayAddress() != 0) ? re.getGatewayAddress() : header.getDestinationAddress();
-            an = arpCache.lookup(nextHopIP);
-
-            if (an == null) {
-              // ARP entry is missing, send ARP request
-              if (dbg)
-                System.out.println("Router ARP Entry Missing: Sending ARP Request");
-              return; // Drop packet for now, will resend when ARP resolves.
+            if (re.getGatewayAddress() != 0) {
+              an = arpCache.lookup(re.getGatewayAddress());
+            } else {
+              an = arpCache.lookup(header.getDestinationAddress());
             }
 
             if (dbg)
               System.out.println("Router Mod Ethernet Frame");
-            MACAddress dstMac = an.getMac();
-
-            if (re == null) {
-              System.out.println("Error: RouteEntry is null!");
-              return;
+            if (an != null) {
+              MACAddress dstMac = an.getMac();
+              MACAddress srcMac = re.getInterface().getMacAddress();
+              nep = nep.setDestinationMACAddress(dstMac.toBytes());
+              nep = nep.setSourceMACAddress(srcMac.toBytes());
             }
-            Iface outIface = re.getInterface();
-            if (outIface == null) {
-              System.out.println("Error: RouteEntry has no associated interface!");
-              return;
-            }
-
-            MACAddress srcMac = outIface.getMacAddress();
-
-            System.out.println("Source MAC: " + srcMac.toString());
-
-            nep = nep.setDestinationMACAddress(dstMac.toBytes());
-            nep = nep.setSourceMACAddress(srcMac.toBytes());
 
             if (dbg)
               System.out.println("Router Sending Packet");
             sendPacket(nep, re.getInterface());
-          } else {
-            if (dbg)
-              System.out.println("Router No Matching Route Found");
           }
         }
       }
     }
+
+    /********************************************************************/
   }
 }
