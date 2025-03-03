@@ -140,9 +140,13 @@ public class Router extends Device {
             if (dbg)
               System.out.println("Router Mod Ethernet Frame");
             MACAddress dstMac = an.getMac();
-            MACAddress srcMac = re.getInterface().getMacAddress();
-            System.out.println("hello");
-            System.out.println("Destination MAC: " + dstMac.toString());
+            Iface outIface = re.getInterface();
+            if (outIface == null) {
+              System.out.println("Error: RouteEntry has no associated interface!");
+              return;
+            }
+
+            MACAddress srcMac = outIface.getMacAddress();
             System.out.println("Source MAC: " + srcMac.toString());
             nep = nep.setDestinationMACAddress(dstMac.toBytes());
             nep = nep.setSourceMACAddress(srcMac.toBytes());
