@@ -75,8 +75,6 @@ public class RouteTable {
     }
   }
 
-  }
-
   /**
    * Populate the route table from a file.
    * 
