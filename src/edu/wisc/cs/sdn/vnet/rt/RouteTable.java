@@ -22,7 +22,6 @@ import edu.wisc.cs.sdn.vnet.Iface;
 public class RouteTable {
   /** Entries in the route table */
   private List<RouteEntry> entries;
-  private final boolean dbg = true;
 
   /**
    * Initialize an empty route table.
@@ -56,18 +55,6 @@ public class RouteTable {
             longestPrefix = prefixLength;
             bestMatch = entry;
           }
-        }
-      }
-
-      if (dbg) {
-        if (bestMatch != null) {
-          System.out.println("Matched RouteEntry: ");
-          System.out.println(" - Interface: " + bestMatch.getInterface().getName());
-          System.out.println(" - Destination: " + IPv4.fromIPv4Address(bestMatch.getDestinationAddress()));
-          System.out.println(" - Gateway: " + IPv4.fromIPv4Address(bestMatch.getGatewayAddress()));
-          System.out.println(" - Subnet Mask: " + IPv4.fromIPv4Address(bestMatch.getMaskAddress()));
-        } else {
-          System.out.println("RouteTable No Match for " + IPv4.fromIPv4Address(ip));
         }
       }
 
