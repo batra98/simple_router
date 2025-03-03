@@ -18,6 +18,8 @@ public class Router extends Device {
   /** ARP cache for the router */
   private ArpCache arpCache;
 
+  private final boolean dbg = true;
+
   /**
    * Creates a router for a specific host.
    * 
@@ -85,6 +87,8 @@ public class Router extends Device {
     /********************************************************************/
     /* TODO: Handle packets */
 
+    if (dbg)
+      System.out.println("Router Checking Ethernet Type");
     if (etherPacket.getEtherType() == Ethernet.TYPE_IPv4) {
 
       IPv4 header = (IPv4) etherPacket.getPayload();
@@ -93,9 +97,13 @@ public class Router extends Device {
       byte[] serialized = header.serialize();
       header = (IPv4) header.deserialize(serialized, 0, serialized.length);
 
+      if (dbg)
+        System.out.println("Router Checking Checksum");
       if (chksm == header.getChecksum()) {
         header = header.setTtl((byte) (header.getTtl() - 1));
 
+        if (dbg)
+          System.out.println("Router Checking TTL");
         if (header.getTtl() > (byte) 0) {
 
           header = header.setChecksum((short) 0);
@@ -103,6 +111,8 @@ public class Router extends Device {
           header = (IPv4) header.deserialize(serialized, 0, serialized.length);
           Ethernet nep = (Ethernet) etherPacket.setPayload(header);
 
+          if (dbg)
+            System.out.println("Router Checking dst == router interface");
           for (Iface ifa : interfaces.values()) {
             if (ifa.getIpAddress() == header.getDestinationAddress()) {
               return;
@@ -111,35 +121,22 @@ public class Router extends Device {
 
           // Forward packet
 
+          if (dbg)
+            System.out.println("Router Lookup RouteTable");
           RouteEntry re = routeTable.lookup(header.getDestinationAddress());
-          if (re == null) {
-            System.err.println(
-                "No route entry found for destination: " + IPv4.fromIPv4Address(header.getDestinationAddress()));
-            return;
-          }
-          Iface outIface = re.getInterface();
-          if (outIface == null) {
-            System.err.println("RouteEntry has null interface for destination: "
-                + IPv4.fromIPv4Address(header.getDestinationAddress()));
-            return;
-          }
-          ArpEntry an_dup = null;
-          int nextHopIp = (re.getGatewayAddress() != 0) ? re.getGatewayAddress() : header.getDestinationAddress();
-          an_dup = arpCache.lookup(nextHopIp);
-
-          if (an_dup == null) {
-            System.err.println("No ARP entry found for next-hop IP: " + IPv4.fromIPv4Address(nextHopIp));
-            return;
-          }
           if (re != null) {
             ArpEntry an = null;
 
+            if (dbg)
+              System.out.println("Router Lookup ARPCache");
             if (re.getGatewayAddress() != 0) {
               an = arpCache.lookup(re.getGatewayAddress());
             } else {
               an = arpCache.lookup(header.getDestinationAddress());
             }
 
+            if (dbg)
+              System.out.println("Router Mod Ethernet Frame");
             if (an != null) {
               MACAddress dstMac = an.getMac();
               MACAddress srcMac = re.getInterface().getMacAddress();
@@ -147,6 +144,8 @@ public class Router extends Device {
               nep = nep.setSourceMACAddress(srcMac.toBytes());
             }
 
+            if (dbg)
+              System.out.println("Router Sending Packet");
             sendPacket(nep, re.getInterface());
           }
         }
