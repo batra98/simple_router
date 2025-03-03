@@ -141,6 +141,9 @@ public class Router extends Device {
               System.out.println("Router Mod Ethernet Frame");
             MACAddress dstMac = an.getMac();
             MACAddress srcMac = re.getInterface().getMacAddress();
+            System.out.println("hello");
+            System.out.println("Destination MAC: " + dstMac.toString());
+            System.out.println("Source MAC: " + srcMac.toString());
             nep = nep.setDestinationMACAddress(dstMac.toBytes());
             nep = nep.setSourceMACAddress(srcMac.toBytes());
 
