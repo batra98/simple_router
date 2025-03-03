@@ -39,7 +39,6 @@ public class Switch extends Device {
     int sourceMAC = etherPacket.getSourceMAC().hashCode();
     int destMAC = etherPacket.getDestinationMAC().hashCode();
 
-    // Learn the source MAC address
     if (!macTable.containsKey(sourceMAC) || macTable.get(sourceMAC).iface != inIface) {
       macTable.put(sourceMAC, new MacTableEntry(inIface));
       scheduleMACExpiration(sourceMAC);
@@ -47,15 +46,12 @@ public class Switch extends Device {
       macTable.get(sourceMAC).refresh();
     }
 
-    // Forwarding decision
     if (macTable.containsKey(destMAC)) {
-      // Known MAC: Forward to the correct interface
       Iface outIface = macTable.get(destMAC).iface;
       if (outIface != inIface) {
         sendPacket(etherPacket, outIface);
       }
     } else {
-      // Unknown MAC: Flood the packet
       for (Iface iface : interfaces.values()) {
         if (!iface.equals(inIface)) {
           sendPacket(etherPacket, iface);
@@ -64,9 +60,6 @@ public class Switch extends Device {
     }
   }
 
-  /**
-   * Schedules the expiration of a MAC address entry after 15 seconds.
-   */
   private void scheduleMACExpiration(int macAddress) {
     timer.schedule(new TimerTask() {
       @Override
@@ -80,9 +73,6 @@ public class Switch extends Device {
     }, 15000);
   }
 
-  /**
-   * Inner class to store MAC table entries with a timeout mechanism.
-   */
   private static class MacTableEntry {
     private Iface iface;
     private long lastUpdated;
