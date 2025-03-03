@@ -103,8 +103,6 @@ public class Router extends Device {
           header = (IPv4) header.deserialize(serialized, 0, serialized.length);
           Ethernet nep = (Ethernet) etherPacket.setPayload(header);
 
-          if (dbg)
-            System.out.println("Router Checking dst == router interface");
           for (Iface ifa : interfaces.values()) {
             if (ifa.getIpAddress() == header.getDestinationAddress()) {
               return;
@@ -114,6 +112,25 @@ public class Router extends Device {
           // Forward packet
 
           RouteEntry re = routeTable.lookup(header.getDestinationAddress());
+          if (re == null) {
+            System.err.println(
+                "No route entry found for destination: " + IPv4.fromIPv4Address(header.getDestinationAddress()));
+            return;
+          }
+          Iface outIface = re.getInterface();
+          if (outIface == null) {
+            System.err.println("RouteEntry has null interface for destination: "
+                + IPv4.fromIPv4Address(header.getDestinationAddress()));
+            return;
+          }
+          ArpEntry an_dup = null;
+          int nextHopIp = (re.getGatewayAddress() != 0) ? re.getGatewayAddress() : header.getDestinationAddress();
+          an_dup = arpCache.lookup(nextHopIp);
+
+          if (an_dup == null) {
+            System.err.println("No ARP entry found for next-hop IP: " + IPv4.fromIPv4Address(nextHopIp));
+            return;
+          }
           if (re != null) {
             ArpEntry an = null;
 
